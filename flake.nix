@@ -52,26 +52,41 @@
     };
 
     devShells.${system} = {
-      default = pkgs.mkShell {
+      default = let
+        overlaidPkgs = import nixpkgs.outPath {
+          inherit system;
+          overlays = [ self.overlays.default ];
+        };
+      in overlaidPkgs.mkShell {
         packages = [
-          (pkgs.python313.withPackages (p: [
-            self.packages.${system}.python313Packages.quimb
+          (overlaidPkgs.python313.withPackages (p: [
+            p.quimb
           ]))
         ];
       };
-      
-      py312 = pkgs.mkShell {
+
+      py312 = let
+        overlaidPkgs = import nixpkgs.outPath {
+          inherit system;
+          overlays = [ self.overlays.default ];
+        };
+      in overlaidPkgs.mkShell {
         packages = [
-          (pkgs.python312.withPackages (p: [
-            self.packages.${system}.python312Packages.quimb
+          (overlaidPkgs.python312.withPackages (p: [
+            p.quimb
           ]))
         ];
       };
-      
-      py313 = pkgs.mkShell {
+
+      py313 = let
+        overlaidPkgs = import nixpkgs.outPath {
+          inherit system;
+          overlays = [ self.overlays.default ];
+        };
+      in overlaidPkgs.mkShell {
         packages = [
-          (pkgs.python313.withPackages (p: [
-            self.packages.${system}.python313Packages.quimb
+          (overlaidPkgs.python313.withPackages (p: [
+            p.quimb
           ]))
         ];
       };
