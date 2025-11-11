@@ -1,5 +1,5 @@
 {
-  description = "ttbregman shell";
+  description = "Quimb Python package with dependencies";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
@@ -8,97 +8,73 @@
     nixpkgs,
     ...
   }: let
-    pkgs = nixpkgs.legacyPackages."x86_64-linux";
-    python = pkgs.python3;
-
-    # Package autoray (no dependencies)
-    autoray = python.pkgs.buildPythonPackage rec {
-      pname = "autoray";
-      version = "0.8.0";
-      pyproject = true;
-
-      src = pkgs.fetchFromGitHub {
-        owner = "jcmgray";
-        repo = "autoray";
-        rev = "v${version}";
-        sha256 = "sha256-OACzYlSg0U6Omd9A2CiAySW3nZKug6hKljWIBUJlFkE=";
-      };
-
-      build-system = with python.pkgs; [
-        hatchling
-        hatch-vcs
-      ];
-    };
-
-    # Package cotengra (requires autoray)
-    cotengra = python.pkgs.buildPythonPackage rec {
-      pname = "cotengra";
-      version = "0.7.5";
-      pyproject = true;
-
-      src = pkgs.fetchFromGitHub {
-        owner = "jcmgray";
-        repo = "cotengra";
-        rev = "v${version}";
-        sha256 = "sha256-lGzdpCcrgl8OArFbd6nM9GRvTkoA4Vj5LtWPgFDa8k8=";
-      };
-
-      build-system = with python.pkgs; [
-        hatchling
-        hatch-vcs
-      ];
-
-      dependencies = [
-        autoray
-      ];
-    };
-
-    # Package quimb
-    quimb = python.pkgs.buildPythonPackage rec {
-      pname = "quimb";
-      version = "1.11.2";
-      pyproject = true;
-
-      src = pkgs.fetchFromGitHub {
-        owner = "jcmgray";
-        repo = "quimb";
-        rev = "v${version}";
-        sha256 = "sha256-+yJHzv8J+DWmpFy+Is6lofxii/ZLlUG8pYsqwBQ5rro=";
-      };
-
-      build-system = with python.pkgs; [
-        hatchling
-        hatch-vcs
-      ];
-
-      dependencies = with python.pkgs; [
-        numpy
-        scipy
-        numba
-        cytoolz
-        tqdm
-        psutil
-        autoray
-        cotengra
-      ];
-    };
+    system = "x86_64-linux";
+    pkgs = nixpkgs.legacyPackages.${system};
+    
+    # Import packages from default.nix
+    defaultPackages = import ./default.nix {inherit pkgs;};
   in {
-    packages.x86_64-linux = {
-      quimb = quimb;
-      autoray = autoray;
-      cotengra = cotengra;
-      default = quimb;
+    # Expose packages in standard Python package structure
+    packages.${system} = {
+      python312Packages = {
+        autoray = defaultPackages.autoray-py312;
+        cotengra = defaultPackages.cotengra-py312;
+        quimb = defaultPackages.quimb-py312;
+      };
+      
+      python313Packages = {
+        autoray = defaultPackages.autoray-py313;
+        cotengra = defaultPackages.cotengra-py313;
+        quimb = defaultPackages.quimb-py313;
+      };
+      
+      # Default to Python 3.13
+      default = defaultPackages.quimb-py313;
     };
 
-    devShells.x86_64-linux.default = pkgs.mkShell {
-      packages = [
-        (python.withPackages (p:
-          with p; [
-            jedi-language-server
-            black
-            quimb
+    # Python overlays for easy integration
+    overlays.default = final: prev: {
+      python312 = prev.python312.override {
+        packageOverrides = pyfinal: pyprev: {
+          quimb = pyfinal.toPythonModule self.packages.${system}.python312Packages.quimb;
+          autoray = pyfinal.toPythonModule self.packages.${system}.python312Packages.autoray;
+          cotengra = pyfinal.toPythonModule self.packages.${system}.python312Packages.cotengra;
+        };
+      };
+      
+      python313 = prev.python313.override {
+        packageOverrides = pyfinal: pyprev: {
+          quimb = pyfinal.toPythonModule self.packages.${system}.python313Packages.quimb;
+          autoray = pyfinal.toPythonModule self.packages.${system}.python313Packages.autoray;
+          cotengra = pyfinal.toPythonModule self.packages.${system}.python313Packages.cotengra;
+        };
+      };
+    };
+
+    devShells.${system} = {
+      default = pkgs.mkShell {
+        packages = [
+          (pkgs.python313.withPackages (p: [
+            self.packages.${system}.python313Packages.quimb
           ]))
-      ];
+        ];
+      };
+      
+      py312 = pkgs.mkShell {
+        packages = [
+          (pkgs.python312.withPackages (p: [
+            self.packages.${system}.python312Packages.quimb
+          ]))
+        ];
+      };
+      
+      py313 = pkgs.mkShell {
+        packages = [
+          (pkgs.python313.withPackages (p: [
+            self.packages.${system}.python313Packages.quimb
+          ]))
+        ];
+      };
     };
   };
 }
